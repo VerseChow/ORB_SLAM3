@@ -449,7 +449,7 @@ void LocalMapping::CreateNewMapPoints()
         auto Ow2 = pKF2->GetCameraCenter_();
         auto vBaseline = Ow2-Ow1;
         const float baseline = cv::norm(vBaseline);
-
+// 
         if(!mbMonocular)
         {
             if(baseline<pKF2->mb)
@@ -625,7 +625,7 @@ void LocalMapping::CreateNewMapPoints()
                     continue;
 
                 // Euclidean coordinates
-                x3D = x3D_h.get_minor<3,1>(0,0) / x3D_h(3);
+                x3D = x3D_h.get_minor<3,1>(0,0) * (1 / x3D_h(3));
                 bEstimated = true;
 
             }

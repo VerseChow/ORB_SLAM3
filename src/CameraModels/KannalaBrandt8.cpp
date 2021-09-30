@@ -98,7 +98,7 @@ namespace ORB_SLAM3 {
         cv::Point2f pw((p2D.x - mvParameters[2]) / mvParameters[0], (p2D.y - mvParameters[3]) / mvParameters[1]);
         float scale = 1.f;
         float theta_d = sqrtf(pw.x * pw.x + pw.y * pw.y);
-        theta_d = fminf(fmaxf(-CV_PI / 2.f, theta_d), CV_PI / 2.f);
+        // theta_d = fminf(fmaxf(-CV_PI / 2.f, theta_d), CV_PI / 2.f);
 
         if (theta_d > 1e-8) {
             //Compensate distortion iteratively
@@ -531,6 +531,6 @@ namespace ORB_SLAM3 {
 
         cv::SVD::compute(A,w,u,vt,cv::SVD::MODIFY_A| cv::SVD::FULL_UV);
         cv::Matx41f x3D_h = vt.row(3).t();
-        x3D = x3D_h.get_minor<3,1>(0,0) / x3D_h(3);
+        x3D = x3D_h.get_minor<3,1>(0,0) * (1 / x3D_h(3));
     }
 }
