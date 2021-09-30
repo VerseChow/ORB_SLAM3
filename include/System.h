@@ -170,7 +170,7 @@ public:
     double GetTimeFromIMUInit();
     bool isLost();
     bool isFinished();
-
+    bool isImuInitialized();
     void ChangeDataset();
 
 #ifdef REGISTER_TIMES

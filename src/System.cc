@@ -743,6 +743,10 @@ bool System::isLost()
 }
 
 
+bool System::isImuInitialized() {
+    return mpAtlas->isImuInitialized();
+}
+
 bool System::isFinished()
 {
     return (GetTimeFromIMUInit()>0.1);

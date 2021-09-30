@@ -181,6 +181,7 @@ void LocalMapping::Run()
                 // Initialize IMU here
                 if(!mpCurrentKeyFrame->GetMap()->isImuInitialized() && mbInertial)
                 {
+                    std::cout << "-------------- LocalMapping:: Try to initialize IMU first time, keyframe size: " << mpAtlas->KeyFramesInMap() << std::endl;
                     if (mbMonocular)
                         InitializeIMU(1e2, 1e10, true);
                     else
@@ -1270,7 +1271,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     int nMinKF;
     if (mbMonocular)
     {
-        minTime = 2.0;
+        minTime = 1.0;
         nMinKF = 10;
     }
     else
@@ -1422,6 +1423,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     bInitializing = false;
 
     mpCurrentKeyFrame->GetMap()->IncreaseChangeIndex();
+    std::cout << "LocalMapping:: Initialze IMU successfully!" << std::endl;
 
     return;
 }
