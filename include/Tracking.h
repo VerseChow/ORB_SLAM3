@@ -20,23 +20,24 @@
 #ifndef TRACKING_H
 #define TRACKING_H
 
-#include<opencv2/core/core.hpp>
-#include<opencv2/features2d/features2d.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/tracking.hpp>
 
-#include"Viewer.h"
-#include"FrameDrawer.h"
-#include"Atlas.h"
-#include"LocalMapping.h"
-#include"LoopClosing.h"
-#include"Frame.h"
+#include "Viewer.h"
+#include "FrameDrawer.h"
+#include "Atlas.h"
+#include "LocalMapping.h"
+#include "LoopClosing.h"
+#include "Frame.h"
 #include "ORBVocabulary.h"
-#include"KeyFrameDatabase.h"
-#include"ORBextractor.h"
+#include "KeyFrameDatabase.h"
+#include "ORBextractor.h"
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
 #include "ImuTypes.h"
+#include "Converter.h"
 
 #include "GeometricCamera.h"
 
@@ -53,10 +54,18 @@ class LocalMapping;
 class LoopClosing;
 class System;
 
+struct TimestampedFramePoseState {
+    double timestamp_sec;
+    Eigen::Quaterniond rotation;
+    Eigen::Vector3d translation;
+    Eigen::Vector3d velocity;
+};
+
 class Tracking
 {  
 
 public:
+
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas,
              KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq=std::string());
 
@@ -92,6 +101,8 @@ public:
     {
         return mpLastKeyFrame;
     }
+
+    TimestampedFramePoseState GetLatestTrackedPoseState();
 
     void CreateMapInAtlas();
     std::mutex mMutexTracks;

@@ -26,9 +26,10 @@
 
 #include<opencv2/core/core.hpp>
 
-#include<System.h>
+#include <System.h>
 #include "ImuTypes.h"
 #include <Statistics.h>
+#include <Tracking.h>
 
 using namespace std;
 
@@ -119,7 +120,6 @@ int main(int argc, char *argv[])
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
     ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::IMU_MONOCULAR, true);
-
     int proccIm=0;
     for (seq = 0; seq<num_seq; seq++)
     {
@@ -128,6 +128,7 @@ int main(int argc, char *argv[])
         proccIm = 0;
 
         double start_timestamp_sec = -1;
+        statistics::Trajectory current_tracking_trajectory;
         for(int ni=0; ni<nImages[seq]; ni++, proccIm++)
         {
             // Read image from file
@@ -193,20 +194,52 @@ int main(int argc, char *argv[])
                 usleep((T-ttrack)*1e6);
 
 
-            std::cout << "tracking state: " << SLAM.GetTrackingState() << ", is imu Initialized: "<< SLAM.isImuInitialized() << std::endl;
-
-            if (start_timestamp_sec < 0) {
-                start_timestamp_sec = tframe;
-            } else if (tframe - start_timestamp_sec > 5.) {
-                std::cout << "--------\n\tInitialization Benchmark: hard reset requested at(sec): " << tframe << std::endl;
-                start_timestamp_sec = tframe;
-                StatisticsCollector::AddSample("reset", 1);
-                StatisticsCollector::PrintStatistics();
-                SLAM.Reset();
+            // std::cout << "tracking state: " << SLAM.GetTrackingState() << ", is imu Initialized: "<< SLAM.isImuInitialized() << std::endl;
+            if (SLAM.isImuInitialized()) {
+                if (start_timestamp_sec < 0) {
+                    start_timestamp_sec = tframe;
+                } else if (tframe - start_timestamp_sec > 0.5) {
+                    std::cout << "--------\n\tInitialization Benchmark: hard reset requested at(sec): " 
+                              << tframe << ", duration: " << tframe - start_timestamp_sec << std::endl;
+                    if (!current_tracking_trajectory.timestamp_secs.empty()) {
+                        statistics::StatisticsCollector::AddTrackingTrajectory(current_tracking_trajectory);
+                    }
+                    statistics::StatisticsCollector::AddSample("hard reset", 1);
+                    current_tracking_trajectory.timestamp_secs.clear();
+                    current_tracking_trajectory.quaternions.clear();
+                    current_tracking_trajectory.trans.clear();
+                    current_tracking_trajectory.vels.clear();
+                    start_timestamp_sec = -1;
+                    SLAM.Reset();
+                } else if (tframe - start_timestamp_sec <= 0.5) {
+                    if (SLAM.isActiveMapResetting()) {
+                        std::cout << "reset ..." << std::endl;
+                        if (!current_tracking_trajectory.timestamp_secs.empty()) {
+                            statistics::StatisticsCollector::AddTrackingTrajectory(current_tracking_trajectory);
+                        }
+                        current_tracking_trajectory.timestamp_secs.clear();
+                        current_tracking_trajectory.quaternions.clear();
+                        current_tracking_trajectory.trans.clear();
+                        current_tracking_trajectory.vels.clear();
+                    } else {
+                        std::cout << "healthy ..." << std::endl;
+                        const auto latest_tracked_pose = SLAM.GetLatestTrackedPoseState();
+                        current_tracking_trajectory.timestamp_secs.push_back(latest_tracked_pose.timestamp_sec); 
+                        current_tracking_trajectory.quaternions.push_back(latest_tracked_pose.rotation); 
+                        current_tracking_trajectory.trans.push_back(latest_tracked_pose.translation); 
+                        current_tracking_trajectory.vels.push_back(latest_tracked_pose.velocity); 
+                    }
+                }
+            } else {
+                current_tracking_trajectory.timestamp_secs.clear();
+                current_tracking_trajectory.quaternions.clear();
+                current_tracking_trajectory.trans.clear();
+                current_tracking_trajectory.vels.clear();
             }
         }
-
-
+        if (!current_tracking_trajectory.timestamp_secs.empty()) {
+            statistics::StatisticsCollector::AddTrackingTrajectory(current_tracking_trajectory);
+        }
         if(seq < num_seq - 1)
         {
             cout << "Changing the dataset" << endl;
@@ -221,10 +254,16 @@ int main(int argc, char *argv[])
     // Save camera trajectory
     if (bFileName)
     {
-        const string kf_file =  "kf_" + string(argv[argc-1]) + ".txt";
-        const string f_file =  "f_" + string(argv[argc-1]) + ".txt";
-        SLAM.SaveTrajectoryEuRoC(f_file);
-        SLAM.SaveKeyFrameTrajectoryEuRoC(kf_file);
+        // const string kf_file =  "kf_" + string(argv[argc-1]) + ".txt";
+        // const string f_file =  "f_" + string(argv[argc-1]) + ".txt";
+        const string initialization_file = string(argv[argc-1]) + "/initialization_traj.csv";
+        const string tracking_file = string(argv[argc-1]) + "/tracking_traj.csv";
+
+        // SLAM.SaveTrajectoryEuRoC(f_file);
+        // SLAM.SaveKeyFrameTrajectoryEuRoC(kf_file);
+        statistics::StatisticsCollector::PrintStatistics();
+        statistics::StatisticsCollector::SaveInitializationTrajectory(initialization_file);
+        statistics::StatisticsCollector::SaveTrackingTrajectory(tracking_file);
     }
     else
     {

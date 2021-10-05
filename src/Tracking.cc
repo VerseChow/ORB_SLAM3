@@ -1597,6 +1597,20 @@ void Tracking::ComputeGyroBias(const vector<Frame*> &vpFs, float &bwx,  float &b
     }
 }
 
+TimestampedFramePoseState Tracking::GetLatestTrackedPoseState() {
+    assert(mpAtlas->isImuInitialized());
+    assert(!mpLocalMapper->mbResetRequestedActiveMap);
+
+    TimestampedFramePoseState frame_pose;
+    const auto kf_ptr = mpLocalMapper->GetCurrKF();
+    frame_pose.timestamp_sec = kf_ptr->mTimeStamp;
+    frame_pose.rotation = Eigen::Quaterniond(Converter::toMatrix3d(kf_ptr->GetImuRotation()));
+    frame_pose.translation = Converter::toVector3d(kf_ptr->GetImuPosition());
+    frame_pose.velocity = Converter::toVector3d(kf_ptr->GetVelocity());
+    return frame_pose;
+
+}
+
 void Tracking::ComputeVelocitiesAccBias(const vector<Frame*> &vpFs, float &bax,  float &bay, float &baz)
 {
     const int N = vpFs.size();

@@ -32,6 +32,7 @@
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/xml_iarchive.hpp>
 #include <boost/archive/xml_oarchive.hpp>
+#include "Statistics.h"
 
 namespace ORB_SLAM3
 {
@@ -368,6 +369,7 @@ void System::Reset()
 void System::ResetActiveMap()
 {
     unique_lock<mutex> lock(mMutexReset);
+    statistics::StatisticsCollector::AddSample("Failed to track reset", 1);
     mbResetActiveMap = true;
 }
 
@@ -742,6 +744,9 @@ bool System::isLost()
     }
 }
 
+TimestampedFramePoseState System::GetLatestTrackedPoseState() {
+    return mpTracker->GetLatestTrackedPoseState();
+}
 
 bool System::isImuInitialized() {
     return mpAtlas->isImuInitialized();

@@ -23,6 +23,7 @@
 #include "Optimizer.h"
 #include "Converter.h"
 #include "Config.h"
+#include "Statistics.h"
 
 #include<mutex>
 #include<chrono>
@@ -1310,6 +1311,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
         vpKF.push_back(mpCurrentKeyFrame);
         lpKF.push_back(mpCurrentKeyFrame);
     }
+    std::cout << "before: " << vpKF[0]->GetImuPosition() << std::endl;
 
     const int N = vpKF.size();
     IMU::Bias b(0,0,0,0,0,0);
@@ -1357,6 +1359,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
     Optimizer::InertialOptimization(mpAtlas->GetCurrentMap(), mRwg, mScale, mbg, mba, mbMonocular, infoInertial, false, false, priorG, priorA);
     std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+    std::cout << "after InertialOptimization: " << vpKF[0]->GetImuPosition() << std::endl;
 
     if (mScale<1e-1)
     {
@@ -1375,6 +1378,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     {
         mpAtlas->GetCurrentMap()->ApplyScaledRotation(Converter::toCvMat(mRwg).t(),mScale,true);
         mpTracker->UpdateFrameIMU(mScale,vpKF[0]->GetImuBias(),mpCurrentKeyFrame);
+        std::cout << "after ApplyScaledRotation : " << vpKF[0]->GetImuPosition() << std::endl;
     }
     std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
 
@@ -1393,6 +1397,7 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
             Optimizer::FullInertialBA(mpAtlas->GetCurrentMap(), 100, false, 0, NULL, true, priorG, priorA);
         else
             Optimizer::FullInertialBA(mpAtlas->GetCurrentMap(), 100, false, 0, NULL, false);
+        std::cout << "after BA: " << vpKF[0]->GetImuPosition() << std::endl;
     }
 
     std::chrono::steady_clock::time_point t5 = std::chrono::steady_clock::now();
@@ -1405,6 +1410,28 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
         mpAtlas->SetImuInitialized();
         mpTracker->t0IMU = mpTracker->mCurrentFrame.mTimeStamp;
         mpCurrentKeyFrame->bImu = true;
+        std::cout << "LocalMapping:: Initialze IMU successfully! scale: " << mScale << std::endl;
+        statistics::Trajectory initialization_traj;
+
+        const Eigen::Matrix3d R0 = Converter::toMatrix3d(vpKF[0]->GetImuRotation());
+        const Eigen::Vector3d t0 = Converter::toVector3d(vpKF[0]->GetImuPosition());
+        const Eigen::Quaterniond q0(R0);
+        initialization_traj.quaternions.push_back(q0);
+        initialization_traj.trans.push_back(Eigen::Vector3d::Zero());
+        initialization_traj.timestamp_secs.push_back(vpKF[0]->mTimeStamp);
+        initialization_traj.vels.push_back(Converter::toVector3d(vpKF[0]->GetVelocity()));
+
+        for (int i = 1; i < vpKF.size(); i++) {
+            const auto& kf_ptr = vpKF[i];
+            const Eigen::Matrix3d eigMat = Converter::toMatrix3d(kf_ptr->GetImuRotation());
+            const Eigen::Quaterniond q(eigMat);
+            initialization_traj.quaternions.push_back(q);
+            initialization_traj.trans.push_back(Converter::toVector3d(kf_ptr->GetImuPosition())-t0);
+            initialization_traj.timestamp_secs.push_back(kf_ptr->mTimeStamp);
+            initialization_traj.vels.push_back(Converter::toVector3d(kf_ptr->GetVelocity()));
+        }
+        statistics::StatisticsCollector::AddInitializationTrajectory(initialization_traj);
+
     }
 
 
@@ -1423,7 +1450,6 @@ void LocalMapping::InitializeIMU(float priorG, float priorA, bool bFIBA)
     bInitializing = false;
 
     mpCurrentKeyFrame->GetMap()->IncreaseChangeIndex();
-    std::cout << "LocalMapping:: Initialze IMU successfully!" << std::endl;
 
     return;
 }
